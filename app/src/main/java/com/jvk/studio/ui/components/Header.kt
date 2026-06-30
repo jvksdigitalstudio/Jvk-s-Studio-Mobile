@@ -365,6 +365,9 @@ fun KeyboardExpandHandle(onClick: () -> Unit) {
         )
     }
 }
+
+@Composable
+fun KeyboardToggleBtn(visible: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
