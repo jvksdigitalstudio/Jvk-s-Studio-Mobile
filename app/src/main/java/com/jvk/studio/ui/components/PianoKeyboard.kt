@@ -24,6 +24,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.*
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -242,10 +244,10 @@ fun PianoKeyboard(
                 val keyHeight   = with(density) { keyHeightPx.toDp() }
                 val blackKeyH   = keyHeight * 0.6f
 
-                val whiteKeyWPx = with(density) { whiteKeyWidth.toPx() }.let { kotlin.math.round(it) }
+                val whiteKeyWPx = with(density) { whiteKeyWidth.toPx() }
                 val blackKeyWPx = with(density) { blackKeyW.toPx() }
-                val blackKeyHPx = with(density) { blackKeyH.toPx() }
 
+                // Used only to PLACE black keys visually (absolute x offset).
                 val keyPositions = remember(whiteKeyWidth) {
                     var wIdx = 0
                     ALL_KEYS.map { key ->
@@ -259,17 +261,32 @@ fun PianoKeyboard(
                     }
                 }
 
+                // ── Ground-truth hit-testing ──
+                // Instead of re-deriving each key's on-screen rectangle from
+                // float math (which can drift from what's actually drawn once
+                // you factor in pixel rounding, zoom, and scroll), every key
+                // reports its OWN real measured bounds here as it's laid out.
+                // Touch detection then just asks "which key's real rectangle
+                // contains this point?" — so rendering and hit-testing can
+                // never disagree, at any zoom level or keyboard size.
+                val keyBoundsPx = remember { mutableStateMapOf<Int, androidx.compose.ui.geometry.Rect>() }
+
                 fun noteAt(x: Float, y: Float): Int? {
-                    ALL_KEYS.forEachIndexed { i, key ->
-                        if (key.isBlack) {
-                            val kx = keyPositions[i]
-                            if (y <= blackKeyHPx && x >= kx && x <= kx + blackKeyWPx) {
-                                return key.midiNote
-                            }
+                    // Black keys are drawn on top, so they win on overlap.
+                    for (key in ALL_KEYS) {
+                        if (!key.isBlack) continue
+                        val b = keyBoundsPx[key.midiNote] ?: continue
+                        if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom) {
+                            return key.midiNote
                         }
                     }
-                    val wIdx = (x / whiteKeyWPx).toInt().coerceIn(0, whiteKeys.size - 1)
-                    return whiteKeys.getOrNull(wIdx)?.midiNote
+                    for (key in whiteKeys) {
+                        val b = keyBoundsPx[key.midiNote] ?: continue
+                        if (x >= b.left && x <= b.right) {
+                            return key.midiNote
+                        }
+                    }
+                    return null
                 }
 
                 val totalWidth = whiteKeyWidth * whiteKeys.size
@@ -323,7 +340,8 @@ fun PianoKeyboard(
                             WhiteKey(
                                 width   = whiteKeyWidth,
                                 pressed = key.midiNote in activeNotes,
-                                label   = if (key.semitone == 0) key.noteName else ""
+                                label   = if (key.semitone == 0) key.noteName else "",
+                                onBoundsChanged = { bounds -> keyBoundsPx[key.midiNote] = bounds }
                             )
                         }
                     }
@@ -336,7 +354,8 @@ fun PianoKeyboard(
                                 xOffset = xDp,
                                 width   = blackKeyW,
                                 height  = blackKeyH,
-                                pressed = key.midiNote in activeNotes
+                                pressed = key.midiNote in activeNotes,
+                                onBoundsChanged = { bounds -> keyBoundsPx[key.midiNote] = bounds }
                             )
                         }
                     }
@@ -348,7 +367,7 @@ fun PianoKeyboard(
 }
 
 @Composable
-fun WhiteKey(width: Dp, pressed: Boolean, label: String) {
+fun WhiteKey(width: Dp, pressed: Boolean, label: String, onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {}) {
     // IMPORTANT: this outer Box's width must be exactly `width` — Compose's
     // Row lays out children using this measured width, and noteAt() in
     // PianoKeyboard assumes every white key occupies exactly `whiteKeyWidth`
@@ -358,12 +377,14 @@ fun WhiteKey(width: Dp, pressed: Boolean, label: String) {
     // keys that drift accumulates into several pixels, enough for a tap to
     // land on the wrong key (worse the more keys are visible / the wider the
     // keyboard). Keeping the outer width untouched and pushing the visual
+
     // gap to an *inner* Box (whose width is derived from the already-fixed
     // parent size) keeps rendering and hit-testing perfectly in sync.
     Box(
         modifier = Modifier
             .width(width)
             .fillMaxHeight()
+            .onGloballyPositioned { coords -> onBoundsChanged(coords.boundsInParent()) }
     ) {
         Box(
             modifier = Modifier
@@ -409,12 +430,13 @@ fun WhiteKey(width: Dp, pressed: Boolean, label: String) {
 }
 
 @Composable
-fun BlackKey(xOffset: Dp, width: Dp, height: Dp, pressed: Boolean) {
+fun BlackKey(xOffset: Dp, width: Dp, height: Dp, pressed: Boolean, onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {}) {
     Box(
         modifier = Modifier
             .absoluteOffset(x = xOffset)
             .width(width)
             .height(height)
+            .onGloballyPositioned { coords -> onBoundsChanged(coords.boundsInParent()) }
             .shadow(if (pressed) 1.dp else 5.dp, RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
             .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
             .background(
