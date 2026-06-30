@@ -75,7 +75,9 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                     // fixed in place, independent of keyboard size.
                     AddChannelButton(
                         onClick  = { showAddChannel = true },
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .offset(y = (-28).dp)
                     )
 
                     // ── Piano keyboard — anchored to bottom, animated show/hide ──

@@ -242,7 +242,7 @@ fun PianoKeyboard(
                 val keyHeight   = with(density) { keyHeightPx.toDp() }
                 val blackKeyH   = keyHeight * 0.6f
 
-                val whiteKeyWPx = with(density) { whiteKeyWidth.toPx() }
+                val whiteKeyWPx = with(density) { whiteKeyWidth.toPx() }.let { kotlin.math.round(it) }
                 val blackKeyWPx = with(density) { blackKeyW.toPx() }
                 val blackKeyHPx = with(density) { blackKeyH.toPx() }
 
@@ -349,44 +349,61 @@ fun PianoKeyboard(
 
 @Composable
 fun WhiteKey(width: Dp, pressed: Boolean, label: String) {
+    // IMPORTANT: this outer Box's width must be exactly `width` — Compose's
+    // Row lays out children using this measured width, and noteAt() in
+    // PianoKeyboard assumes every white key occupies exactly `whiteKeyWidth`
+    // px. Splitting the width into "width - 1.dp" + "padding(end = 1.dp)"
+    // (the old approach) rounds each piece to whole pixels SEPARATELY, which
+    // can drift the actual rendered slot by ±1px per key. Across ~50 white
+    // keys that drift accumulates into several pixels, enough for a tap to
+    // land on the wrong key (worse the more keys are visible / the wider the
+    // keyboard). Keeping the outer width untouched and pushing the visual
+    // gap to an *inner* Box (whose width is derived from the already-fixed
+    // parent size) keeps rendering and hit-testing perfectly in sync.
     Box(
         modifier = Modifier
-            .width(width - 1.dp)
+            .width(width)
             .fillMaxHeight()
-            .padding(end = 1.dp)
-            .shadow(if (pressed) 0.dp else 3.dp, RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-            .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-            .background(
-                if (pressed) Brush.verticalGradient(
-                    listOf(FlPurpleLight, FlPurple, FlPurpleDim)
-                ) else Brush.verticalGradient(
-                    listOf(
-                        Color(0xFFFFFFFF),
-                        Color(0xFFF3EEFF),
-                        Color(0xFFE2D6F7),
-                        Color(0xFFD2C2EE)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .padding(end = 1.dp)
+                .shadow(if (pressed) 0.dp else 3.dp, RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
+                .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
+                .background(
+                    if (pressed) Brush.verticalGradient(
+                        listOf(FlPurpleLight, FlPurple, FlPurpleDim)
+                    ) else Brush.verticalGradient(
+                        listOf(
+                            Color(0xFFFFFFFF),
+                            Color(0xFFF3EEFF),
+                            Color(0xFFE2D6F7),
+                            Color(0xFFD2C2EE)
+                        )
                     )
                 )
-            )
-            .border(
-                width = 0.6.dp,
-                color = if (pressed) FlPurpleLight.copy(alpha = 0.8f) else Color(0xFFBBA8DD).copy(alpha = 0.5f),
-                shape = RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp)
-            ),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        if (label.isNotEmpty()) {
-            Text(
-                text  = label,
-                style = TextStyle(
-                    fontFamily   = FontFamily.Monospace,
-                    fontWeight   = FontWeight.SemiBold,
-                    fontSize     = 8.sp,
-                    letterSpacing = 0.5.sp,
-                    color = if (pressed) Color.White else Color(0xFF6B4FA8).copy(alpha = 0.85f)
+                .border(
+                    width = 0.6.dp,
+                    color = if (pressed) FlPurpleLight.copy(alpha = 0.8f) else Color(0xFFBBA8DD).copy(alpha = 0.5f),
+                    shape = RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp)
                 ),
-                modifier = Modifier.padding(bottom = 6.dp)
-            )
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            if (label.isNotEmpty()) {
+                Text(
+                    text  = label,
+                    style = TextStyle(
+                        fontFamily   = FontFamily.Monospace,
+                        fontWeight   = FontWeight.SemiBold,
+                        fontSize     = 8.sp,
+                        letterSpacing = 0.5.sp,
+                        color = if (pressed) Color.White else Color(0xFF6B4FA8).copy(alpha = 0.85f)
+                    ),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                )
+            }
         }
     }
 }
