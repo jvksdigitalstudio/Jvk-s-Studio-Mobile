@@ -70,8 +70,8 @@ fun PianoKeyboard(
 
     val pointerMap = remember { mutableStateMapOf<Long, Int>() }
 
-    // ── Premium frame: dark housing + top highlight rail ──
-    Box(
+    // ── Premium frame: dark housing + header bar + keys ──
+    Column(
         modifier = modifier
             .background(
                 Brush.verticalGradient(
@@ -79,29 +79,80 @@ fun PianoKeyboard(
                 )
             )
     ) {
-        // Top accent rail (glowing separator from work area)
+        // ── Header bar — accent rail + close (×) button, sits ABOVE the keys ──
+        // Closing this (×) hides the ENTIRE piano roll, header included.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(2.dp)
-                .align(Alignment.TopCenter)
+                .height(34.dp)
                 .background(
                     Brush.horizontalGradient(
-                        listOf(
-                            Color.Transparent,
-                            FlPurple.copy(alpha = 0.15f),
-                            FlPurpleLight.copy(alpha = 0.55f),
-                            FlPurple.copy(alpha = 0.15f),
-                            Color.Transparent
-                        )
+                        listOf(Color(0xFF140B22), Color(0xFF0D0716), Color(0xFF140B22))
                     )
                 )
-        )
+        ) {
+            // glowing separator line
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp)
+                    .align(Alignment.TopCenter)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                FlPurple.copy(alpha = 0.15f),
+                                FlPurpleLight.copy(alpha = 0.55f),
+                                FlPurple.copy(alpha = 0.15f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
+
+            Text(
+                text = "⌨ TECLADO",
+                style = TextStyle(
+                    fontFamily    = FontFamily.Monospace,
+                    fontWeight    = FontWeight.SemiBold,
+                    fontSize      = 10.sp,
+                    letterSpacing = 1.sp,
+                    color         = FlPurpleLight.copy(alpha = 0.55f)
+                ),
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp)
+            )
+
+            // Close (×) button — top-right, in the keyboard's own header.
+            // Hides the whole piano roll (header + keys) when tapped.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 8.dp)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF2A1F40), Color(0xFF160E26))
+                        )
+                    )
+                    .border(1.dp, FlPurple.copy(alpha = 0.55f), CircleShape)
+                    .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector        = Icons.Default.Close,
+                    contentDescription = "Ocultar teclado",
+                    tint               = FlPurpleLight,
+                    modifier           = Modifier.size(14.dp)
+                )
+            }
+        }
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(top = 3.dp, start = 2.dp, end = 2.dp, bottom = 4.dp)
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(start = 2.dp, end = 2.dp, bottom = 4.dp)
                 .clip(RoundedCornerShape(topStart = 10.dp, topEnd = 10.dp))
                 .background(Color(0xFF070410))
                 .horizontalScroll(scrollState)
@@ -211,31 +262,6 @@ fun PianoKeyboard(
                     }
                 }
             }
-        }
-
-        // ── Close (×) button — top-right corner, FL Mobile style ──
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 6.dp, end = 8.dp)
-                .size(30.dp)
-                .shadow(4.dp, CircleShape)
-                .clip(CircleShape)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xFF2A1F40), Color(0xFF160E26))
-                    )
-                )
-                .border(1.dp, FlPurple.copy(alpha = 0.55f), CircleShape)
-                .pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector        = Icons.Default.Close,
-                contentDescription = "Ocultar teclado",
-                tint               = FlPurpleLight,
-                modifier           = Modifier.size(16.dp)
-            )
         }
     }
 }

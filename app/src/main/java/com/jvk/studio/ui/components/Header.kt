@@ -89,17 +89,8 @@ fun AppHeader(
             )
         }
 
-        // Keyboard toggle right
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 16.dp)
-        ) {
-            KeyboardToggleBtn(
-                visible = keyboardVisible,
-                onClick = onKeyboardToggle
-            )
-        }
+        // (Keyboard toggle removed from header — use the × button on the keyboard itself,
+        //  or the expand handle that appears when the keyboard is hidden.)
     }
 }
 
