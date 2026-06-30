@@ -82,6 +82,7 @@ fun PianoKeyboard(
     // ── Resizable height (1-finger drag on header) — grows up until it meets
     //    the app header above, shrinks down until only this header remains. ──
     var keyboardHeight by remember { mutableStateOf(initialHeight) }
+    var lastExpandedHeight by remember { mutableStateOf(initialHeight) }
     val minHeightPx = with(density) { minHeight.toPx() }
     val maxHeightPx = with(density) { maxHeight.toPx() }
 
@@ -114,9 +115,14 @@ fun PianoKeyboard(
                     )
                 )
                 // ── FL Mobile-style header resize handle ──
-                // • 1 finger, press+drag anywhere on the header: drag UP grows the
-                //   keyboard (up to touching the app header above), drag DOWN
-                //   shrinks it (down to where only this header bar remains).
+                // • 1 finger, press+drag anywhere on the header:
+                //     - drag UP/DOWN grows/shrinks the keyboard (up to
+                //       touching the app header above / down to just the
+                //       header bar remaining).
+                //     - drag LEFT/RIGHT pans the keyboard through octaves
+                //       (same feel as dragging your finger across any
+                //       horizontally-scrollable list) — both can happen at
+                //       once on a diagonal drag.
                 // • 2 fingers, pinch horizontally on the header: spreading apart
                 //   zooms the keys IN (bigger keys, fewer octaves visible),
                 //   pinching together zooms OUT (smaller keys, more octaves).
@@ -130,8 +136,12 @@ fun PianoKeyboard(
                 // movement" and feeding it back into the resize, which is what
                 // caused the bounce/jitter/delay.
                 .pointerInput(Unit) {
+                    val tapSlopPx = with(density) { 8.dp.toPx() }
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
+
+                        var totalDrag = 0f
+                        var multiTouchUsed = false
 
                         while (true) {
                             val event = awaitPointerEvent()
@@ -143,15 +153,25 @@ fun PianoKeyboard(
                                     break
                                 }
                                 1 -> {
-                                    val dy = -pressed[0].positionChange().y // up = positive
+                                    val change = pressed[0]
+                                    val dy = -change.positionChange().y // up = positive
+                                    val dx = change.positionChange().x  // right = positive
+                                    totalDrag += kotlin.math.abs(dx) + kotlin.math.abs(dy)
+
                                     if (dy != 0f) {
                                         val newHeightPx =
                                             (with(density) { keyboardHeight.toPx() } + dy)
                                                 .coerceIn(minHeightPx, maxHeightPx)
                                         keyboardHeight = with(density) { newHeightPx.toDp() }
                                     }
+                                    if (dx != 0f) {
+                                        // Drag left → pan toward higher octaves (scroll
+                                        // forward); drag right → pan toward lower octaves.
+                                        scrollState.scrollBy(-dx)
+                                    }
                                 }
                                 else -> {
+                                    multiTouchUsed = true
                                     val c1 = pressed[0]
                                     val c2 = pressed[1]
                                     // Horizontal spread between the two fingers — this is
@@ -171,6 +191,20 @@ fun PianoKeyboard(
                             }
 
                             event.changes.forEach { it.consume() }
+                        }
+
+                        // ── Tap-to-collapse / tap-to-restore (FL Mobile style) ──
+                        // A clean tap (one finger, negligible movement — i.e. not a
+                        // drag and not part of a pinch) toggles the keyboard between
+                        // collapsed (header-only) and however tall it was before it
+                        // was collapsed, instead of always snapping to a fixed size.
+                        if (!multiTouchUsed && totalDrag < tapSlopPx) {
+                            if (keyboardHeight <= minHeight + 1.dp) {
+                                keyboardHeight = lastExpandedHeight.coerceIn(minHeight, maxHeight)
+                            } else {
+                                lastExpandedHeight = keyboardHeight
+                                keyboardHeight = minHeight
+                            }
                         }
                     }
                 }
