@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jvk.studio.ui.theme.*
+import kotlinx.coroutines.launch
 
 private val BLACK_SEMITONES = setOf(1, 3, 6, 8, 10)
 private val NOTE_NAMES = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
@@ -77,6 +78,7 @@ fun PianoKeyboard(
     val density     = LocalDensity.current
     val whiteKeys   = remember { ALL_KEYS.filter { !it.isBlack } }
     val scrollState = rememberScrollState()
+    val coroutineScope = rememberCoroutineScope()
 
     val pointerMap = remember { mutableStateMapOf<Long, Int>() }
 
@@ -168,7 +170,14 @@ fun PianoKeyboard(
                                     if (dx != 0f) {
                                         // Drag left → pan toward higher octaves (scroll
                                         // forward); drag right → pan toward lower octaves.
-                                        scrollState.scrollBy(-dx)
+                                        // NOTE: scrollBy is a suspend fun, but this gesture
+                                        // block runs on Compose's *restricted* pointer-input
+                                        // coroutine scope, which can only call its own
+                                        // built-in suspend functions (awaitPointerEvent,
+                                        // etc.) directly. Launching on a regular
+                                        // rememberCoroutineScope() sidesteps that
+                                        // restriction.
+                                        coroutineScope.launch { scrollState.scrollBy(-dx) }
                                     }
                                 }
                                 else -> {
