@@ -1,23 +1,18 @@
 package com.jvk.studio.ui.components
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -63,15 +58,6 @@ fun AppHeader(
                 shape = RoundedCornerShape(0.dp)
             )
     ) {
-        // Logo left
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 16.dp)
-        ) {
-            ShimmerTitle()
-        }
-
         // Transport centered
         Row(
             modifier = Modifier.align(Alignment.Center),
@@ -92,50 +78,6 @@ fun AppHeader(
         // (Keyboard toggle removed from header — use the × button on the keyboard itself,
         //  or the expand handle that appears when the keyboard is hidden.)
     }
-}
-
-@Composable
-fun ShimmerTitle() {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val shimmerOffset by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "shimmerOffset"
-    )
-
-    val brush = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF7a8fa8),
-            Color(0xFFb0c8e0),
-            Color(0xFFffffff),
-            Color(0xFFc8daf0),
-            Color(0xFFffffff),
-            Color(0xFFb0c4dc),
-            Color(0xFF8a9db8),
-        ),
-        start = Offset(shimmerOffset * 400f, 0f),
-        end = Offset(shimmerOffset * 400f + 200f, 0f)
-    )
-
-    Text(
-        text = "JVK'S STUDIO MOBILE",
-        style = TextStyle(
-            brush = brush,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Black,
-            fontSize = 14.sp,
-            letterSpacing = 3.sp,
-            shadow = Shadow(
-                color = Color(0x88B0D0FF),
-                offset = Offset(0f, 2f),
-                blurRadius = 12f
-            )
-        )
-    )
 }
 
 @Composable
@@ -322,37 +264,6 @@ fun BpmControl(bpm: Int, onBpmChange: (Int) -> Unit) {
                         }
                     )
                 }
-        )
-    }
-}
-
-@Composable
-fun KeyboardExpandHandle(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .padding(end = 10.dp, bottom = 10.dp)
-            .size(36.dp)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFF221636), Color(0xFF0E081A))
-                ),
-                RoundedCornerShape(18.dp)
-            )
-            .border(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(FlPurple.copy(alpha = 0.4f), FlPurpleLight.copy(alpha = 0.7f))
-                ),
-                RoundedCornerShape(18.dp)
-            )
-            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector        = Icons.Default.OpenInFull,
-            contentDescription = "Mostrar teclado",
-            tint               = FlPurpleLight,
-            modifier           = Modifier.size(16.dp)
         )
     }
 }

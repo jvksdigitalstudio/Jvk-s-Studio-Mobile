@@ -15,7 +15,6 @@ import com.jvk.studio.MainViewModel
 import com.jvk.studio.ui.components.AddChannelButton
 import com.jvk.studio.ui.components.AddChannelSheet
 import com.jvk.studio.ui.components.AppHeader
-import com.jvk.studio.ui.components.KeyboardExpandHandle
 import com.jvk.studio.ui.components.PianoKeyboard
 import com.jvk.studio.ui.theme.FlDark
 
@@ -114,15 +113,5 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
             visible   = showAddChannel,
             onDismiss = { showAddChannel = false }
         )
-
-        // ── Collapsed handle — bottom-right tab to re-expand the keyboard, FL Mobile style ──
-        AnimatedVisibility(
-            visible  = !keyboardVisible,
-            modifier = Modifier.align(Alignment.BottomEnd),
-            enter    = fadeIn(),
-            exit     = fadeOut()
-        ) {
-            KeyboardExpandHandle(onClick = { vm.toggleKeyboard() })
-        }
     }
 }

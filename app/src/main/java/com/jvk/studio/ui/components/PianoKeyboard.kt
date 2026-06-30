@@ -12,7 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Piano
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -290,7 +290,7 @@ fun PianoKeyboard(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector        = Icons.Default.Close,
+                    imageVector        = Icons.Default.Piano,
                     contentDescription = "Ocultar teclado",
                     tint               = FlPurpleLight,
                     modifier           = Modifier.size(14.dp)
