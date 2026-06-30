@@ -35,6 +35,7 @@ import com.jvk.studio.ui.theme.*
 
 private val BLACK_SEMITONES = setOf(1, 3, 6, 8, 10)
 private val NOTE_NAMES = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
+private val HEADER_HEIGHT = 34.dp
 
 data class KeyInfo(
     val midiNote: Int,
@@ -67,7 +68,7 @@ fun PianoKeyboard(
     minKeyWidth: Dp = 22.dp,
     maxKeyWidth: Dp = 72.dp,
     initialHeight: Dp = 220.dp,
-    minHeight: Dp = 40.dp,
+    minHeight: Dp = HEADER_HEIGHT,
     maxHeight: Dp = 480.dp,
 ) {
     val density     = LocalDensity.current
@@ -104,7 +105,7 @@ fun PianoKeyboard(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(34.dp)
+                .height(HEADER_HEIGHT)
                 .background(
                     Brush.horizontalGradient(
                         listOf(Color(0xFF140B22), Color(0xFF0D0716), Color(0xFF140B22))
@@ -117,11 +118,18 @@ fun PianoKeyboard(
                 // • 2 fingers, pinch horizontally on the header: spreading apart
                 //   zooms the keys IN (bigger keys, fewer octaves visible),
                 //   pinching together zooms OUT (smaller keys, more octaves).
+                //
+                // NOTE: we deliberately use change.positionChange() (the delta
+                // computed by Compose *within* a single event) instead of storing
+                // a raw Y/distance and diffing it against the next event. Because
+                // this very gesture resizes the header itself, the header moves
+                // on screen every frame — comparing raw positions captured on two
+                // different frames was measuring that self-movement as "finger
+                // movement" and feeding it back into the resize, which is what
+                // caused the bounce/jitter/delay.
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
-                        var lastSingleY: Float? = null
-                        var lastPinchDistance: Float? = null
 
                         while (true) {
                             val event = awaitPointerEvent()
@@ -133,34 +141,30 @@ fun PianoKeyboard(
                                     break
                                 }
                                 1 -> {
-                                    lastPinchDistance = null
-                                    val y = pressed[0].position.y
-                                    val prevY = lastSingleY
-                                    if (prevY != null) {
-                                        val dy = prevY - y // up = positive
+                                    val dy = -pressed[0].positionChange().y // up = positive
+                                    if (dy != 0f) {
                                         val newHeightPx =
                                             (with(density) { keyboardHeight.toPx() } + dy)
                                                 .coerceIn(minHeightPx, maxHeightPx)
                                         keyboardHeight = with(density) { newHeightPx.toDp() }
                                     }
-                                    lastSingleY = y
                                 }
                                 else -> {
-                                    lastSingleY = null
-                                    val p1 = pressed[0].position
-                                    val p2 = pressed[1].position
+                                    val c1 = pressed[0]
+                                    val c2 = pressed[1]
                                     // Horizontal spread between the two fingers — this is
                                     // what drives the octave/key-width zoom (not vertical).
-                                    val distance = kotlin.math.abs(p1.x - p2.x)
-                                    val prevDistance = lastPinchDistance
-                                    if (prevDistance != null) {
-                                        val dDistance = distance - prevDistance
+                                    val currDistance = kotlin.math.abs(c1.position.x - c2.position.x)
+                                    val prevP1 = c1.position - c1.positionChange()
+                                    val prevP2 = c2.position - c2.positionChange()
+                                    val prevDistance = kotlin.math.abs(prevP1.x - prevP2.x)
+                                    val dDistance = currDistance - prevDistance
+                                    if (dDistance != 0f) {
                                         val newWidthPx =
                                             (with(density) { whiteKeyWidth.toPx() } + dDistance * 0.5f)
                                                 .coerceIn(minKeyWidthPx, maxKeyWidthPx)
                                         whiteKeyWidth = with(density) { newWidthPx.toDp() }
                                     }
-                                    lastPinchDistance = distance
                                 }
                             }
 
@@ -216,6 +220,14 @@ fun PianoKeyboard(
             }
         }
 
+        // Only render the keys area when there's real room for it. At minimum
+        // height (header only) this avoids a near-zero-height rounded box,
+        // which used to leave a stray sliver/line visible at the bottom.
+        val keysAreaVisible = keyboardHeight > HEADER_HEIGHT + 2.dp
+
+        if (!keysAreaVisible) {
+            Spacer(modifier = Modifier.weight(1f))
+        } else {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -331,6 +343,7 @@ fun PianoKeyboard(
                 }
             }
         }
+        } // end keysAreaVisible else-branch
     }
 }
 

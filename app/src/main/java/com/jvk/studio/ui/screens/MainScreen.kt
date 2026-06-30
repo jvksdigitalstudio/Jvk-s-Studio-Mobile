@@ -62,24 +62,28 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
             ) {
                 val availableHeight = maxHeight
 
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // ── Work area (playlist/sequencer placeholder) ──
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(FlDark),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        // FL Mobile-style "+" entry point to add channels/instruments
-                        AddChannelButton(onClick = { showAddChannel = true })
-                    }
+                // Layered (not nested-Column) on purpose: the "+" button is
+                // aligned to the center of THIS fixed-size region, so it never
+                // moves when the piano keyboard below grows/shrinks — only the
+                // keyboard itself (anchored to the bottom) resizes.
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(FlDark)
+                ) {
+                    // FL Mobile-style "+" entry point to add channels/instruments —
+                    // fixed in place, independent of keyboard size.
+                    AddChannelButton(
+                        onClick  = { showAddChannel = true },
+                        modifier = Modifier.align(Alignment.Center)
+                    )
 
                     // ── Piano keyboard — anchored to bottom, animated show/hide ──
                     AnimatedVisibility(
-                        visible = keyboardVisible,
-                        enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                        exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                        visible  = keyboardVisible,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                        enter    = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                        exit     = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
                     ) {
                         PianoKeyboard(
                             modifier    = Modifier.fillMaxWidth(),
@@ -97,7 +101,6 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                             // (touching AppHeader), and shrink down to just its own
                             // header bar.
                             maxHeight  = availableHeight,
-                            minHeight  = 40.dp,
                         )
                     }
                 }
