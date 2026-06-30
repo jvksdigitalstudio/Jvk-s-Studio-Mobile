@@ -2,6 +2,8 @@ package com.jvk.studio.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -62,6 +64,9 @@ fun PianoKeyboard(
     onNoteOff: (Int) -> Unit,
     onClose: () -> Unit = {},
     whiteKeyWidth: Dp = 42.dp,
+    initialHeight: Dp = 220.dp,
+    minHeight: Dp = 140.dp,
+    maxHeight: Dp = 480.dp,
 ) {
     val density     = LocalDensity.current
     val whiteKeys   = remember { ALL_KEYS.filter { !it.isBlack } }
@@ -70,9 +75,16 @@ fun PianoKeyboard(
 
     val pointerMap = remember { mutableStateMapOf<Long, Int>() }
 
+    // ── Resizable height — driven from the header (1-finger drag or 2-finger pinch),
+    //    just like FL Studio Mobile's piano roll grip. ──
+    var keyboardHeight by remember { mutableStateOf(initialHeight) }
+    val minHeightPx = with(density) { minHeight.toPx() }
+    val maxHeightPx = with(density) { maxHeight.toPx() }
+
     // ── Premium frame: dark housing + header bar + keys ──
     Column(
         modifier = modifier
+            .height(keyboardHeight)
             .background(
                 Brush.verticalGradient(
                     listOf(Color(0xFF0A0712), Color(0xFF050309))
@@ -90,6 +102,60 @@ fun PianoKeyboard(
                         listOf(Color(0xFF140B22), Color(0xFF0D0716), Color(0xFF140B22))
                     )
                 )
+                // ── FL Mobile-style header resize handle ──
+                // • 1 finger, press+drag anywhere on the header: drag UP grows the
+                //   keyboard, drag DOWN shrinks it.
+                // • 2 fingers, pinch on the header: spreading apart grows it,
+                //   pinching together shrinks it (true pinch-zoom).
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var lastSingleY: Float? = null
+                        var lastPinchDistance: Float? = null
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.filter { it.pressed }
+
+                            when (pressed.size) {
+                                0 -> {
+                                    // all fingers lifted — gesture over
+                                    break
+                                }
+                                1 -> {
+                                    lastPinchDistance = null
+                                    val y = pressed[0].position.y
+                                    val prevY = lastSingleY
+                                    if (prevY != null) {
+                                        val dy = prevY - y // up = positive
+                                        val newHeightPx =
+                                            (with(density) { keyboardHeight.toPx() } + dy)
+                                                .coerceIn(minHeightPx, maxHeightPx)
+                                        keyboardHeight = with(density) { newHeightPx.toDp() }
+                                    }
+                                    lastSingleY = y
+                                }
+                                else -> {
+                                    lastSingleY = null
+                                    val p1 = pressed[0].position
+                                    val p2 = pressed[1].position
+                                    val distance = (p1 - p2).getDistance()
+                                    val prevDistance = lastPinchDistance
+                                    if (prevDistance != null) {
+                                        val dDistance = distance - prevDistance
+                                        val newHeightPx =
+                                            (with(density) { keyboardHeight.toPx() } + dDistance)
+                                                .coerceIn(minHeightPx, maxHeightPx)
+                                        keyboardHeight = with(density) { newHeightPx.toDp() }
+                                    }
+                                    lastPinchDistance = distance
+                                }
+                            }
+
+                            event.changes.forEach { it.consume() }
+                        }
+                    }
+                }
         ) {
             // glowing separator line
             Box(
@@ -110,17 +176,7 @@ fun PianoKeyboard(
                     )
             )
 
-            Text(
-                text = "⌨ TECLADO",
-                style = TextStyle(
-                    fontFamily    = FontFamily.Monospace,
-                    fontWeight    = FontWeight.SemiBold,
-                    fontSize      = 10.sp,
-                    letterSpacing = 1.sp,
-                    color         = FlPurpleLight.copy(alpha = 0.55f)
-                ),
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp)
-            )
+            // (label text intentionally removed — header kept for drag/pinch resize + close button)
 
             // Close (×) button — top-right, in the keyboard's own header.
             // Hides the whole piano roll (header + keys) when tapped.

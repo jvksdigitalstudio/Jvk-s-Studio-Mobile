@@ -72,8 +72,7 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
             ) {
                 PianoKeyboard(
                     modifier    = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp),
+                        .fillMaxWidth(),
                     activeNotes = activeNotes.value,
                     onNoteOn    = { note ->
                         activeNotes.value = activeNotes.value + note
