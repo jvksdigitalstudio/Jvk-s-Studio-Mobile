@@ -79,7 +79,7 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                     )
 
                     // ── Piano keyboard — anchored to bottom, animated show/hide ──
-                    AnimatedVisibility(
+                    androidx.compose.animation.AnimatedVisibility(
                         visible  = keyboardVisible,
                         modifier = Modifier.align(Alignment.BottomCenter),
                         enter    = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
