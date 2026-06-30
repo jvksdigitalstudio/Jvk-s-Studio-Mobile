@@ -52,38 +52,55 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                 onKeyboardToggle = { vm.toggleKeyboard() }
             )
 
-            // ── Work area (playlist/sequencer placeholder) — fills remaining space above keyboard ──
-            Box(
+            // ── Work area + piano keyboard share this region; measuring it lets the
+            //    keyboard know exactly how tall it's allowed to grow (i.e. until it
+            //    touches AppHeader above) when the user drags/expands it. ──
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .background(FlDark),
-                contentAlignment = Alignment.Center
             ) {
-                // FL Mobile-style "+" entry point to add channels/instruments
-                AddChannelButton(onClick = { showAddChannel = true })
-            }
+                val availableHeight = maxHeight
 
-            // ── Piano keyboard — anchored to bottom, animated show/hide ──
-            AnimatedVisibility(
-                visible = keyboardVisible,
-                enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-            ) {
-                PianoKeyboard(
-                    modifier    = Modifier
-                        .fillMaxWidth(),
-                    activeNotes = activeNotes.value,
-                    onNoteOn    = { note ->
-                        activeNotes.value = activeNotes.value + note
-                        vm.noteOn(note)
-                    },
-                    onNoteOff   = { note ->
-                        activeNotes.value = activeNotes.value - note
-                        vm.noteOff(note)
-                    },
-                    onClose     = { vm.toggleKeyboard() }
-                )
+                Column(modifier = Modifier.fillMaxSize()) {
+                    // ── Work area (playlist/sequencer placeholder) ──
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(FlDark),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // FL Mobile-style "+" entry point to add channels/instruments
+                        AddChannelButton(onClick = { showAddChannel = true })
+                    }
+
+                    // ── Piano keyboard — anchored to bottom, animated show/hide ──
+                    AnimatedVisibility(
+                        visible = keyboardVisible,
+                        enter   = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                        exit    = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
+                    ) {
+                        PianoKeyboard(
+                            modifier    = Modifier.fillMaxWidth(),
+                            activeNotes = activeNotes.value,
+                            onNoteOn    = { note ->
+                                activeNotes.value = activeNotes.value + note
+                                vm.noteOn(note)
+                            },
+                            onNoteOff   = { note ->
+                                activeNotes.value = activeNotes.value - note
+                                vm.noteOff(note)
+                            },
+                            onClose    = { vm.toggleKeyboard() },
+                            // Can grow until it fully replaces the work area above
+                            // (touching AppHeader), and shrink down to just its own
+                            // header bar.
+                            maxHeight  = availableHeight,
+                            minHeight  = 40.dp,
+                        )
+                    }
+                }
             }
         }
 

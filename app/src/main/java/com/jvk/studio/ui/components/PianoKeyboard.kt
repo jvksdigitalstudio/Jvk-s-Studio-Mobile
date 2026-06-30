@@ -63,23 +63,31 @@ fun PianoKeyboard(
     onNoteOn: (Int) -> Unit,
     onNoteOff: (Int) -> Unit,
     onClose: () -> Unit = {},
-    whiteKeyWidth: Dp = 42.dp,
+    initialKeyWidth: Dp = 42.dp,
+    minKeyWidth: Dp = 22.dp,
+    maxKeyWidth: Dp = 72.dp,
     initialHeight: Dp = 220.dp,
-    minHeight: Dp = 140.dp,
+    minHeight: Dp = 40.dp,
     maxHeight: Dp = 480.dp,
 ) {
     val density     = LocalDensity.current
     val whiteKeys   = remember { ALL_KEYS.filter { !it.isBlack } }
-    val blackKeyW   = whiteKeyWidth * 0.6f
     val scrollState = rememberScrollState()
 
     val pointerMap = remember { mutableStateMapOf<Long, Int>() }
 
-    // ── Resizable height — driven from the header (1-finger drag or 2-finger pinch),
-    //    just like FL Studio Mobile's piano roll grip. ──
+    // ── Resizable height (1-finger drag on header) — grows up until it meets
+    //    the app header above, shrinks down until only this header remains. ──
     var keyboardHeight by remember { mutableStateOf(initialHeight) }
     val minHeightPx = with(density) { minHeight.toPx() }
     val maxHeightPx = with(density) { maxHeight.toPx() }
+
+    // ── Resizable key width (2-finger pinch on header) — like FL Mobile's
+    //    piano roll zoom: spread = fewer/bigger keys, pinch = more/smaller keys. ──
+    var whiteKeyWidth by remember { mutableStateOf(initialKeyWidth) }
+    val blackKeyW     = whiteKeyWidth * 0.6f
+    val minKeyWidthPx = with(density) { minKeyWidth.toPx() }
+    val maxKeyWidthPx = with(density) { maxKeyWidth.toPx() }
 
     // ── Premium frame: dark housing + header bar + keys ──
     Column(
@@ -104,9 +112,11 @@ fun PianoKeyboard(
                 )
                 // ── FL Mobile-style header resize handle ──
                 // • 1 finger, press+drag anywhere on the header: drag UP grows the
-                //   keyboard, drag DOWN shrinks it.
-                // • 2 fingers, pinch on the header: spreading apart grows it,
-                //   pinching together shrinks it (true pinch-zoom).
+                //   keyboard (up to touching the app header above), drag DOWN
+                //   shrinks it (down to where only this header bar remains).
+                // • 2 fingers, pinch horizontally on the header: spreading apart
+                //   zooms the keys IN (bigger keys, fewer octaves visible),
+                //   pinching together zooms OUT (smaller keys, more octaves).
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
@@ -139,14 +149,16 @@ fun PianoKeyboard(
                                     lastSingleY = null
                                     val p1 = pressed[0].position
                                     val p2 = pressed[1].position
-                                    val distance = (p1 - p2).getDistance()
+                                    // Horizontal spread between the two fingers — this is
+                                    // what drives the octave/key-width zoom (not vertical).
+                                    val distance = kotlin.math.abs(p1.x - p2.x)
                                     val prevDistance = lastPinchDistance
                                     if (prevDistance != null) {
                                         val dDistance = distance - prevDistance
-                                        val newHeightPx =
-                                            (with(density) { keyboardHeight.toPx() } + dDistance)
-                                                .coerceIn(minHeightPx, maxHeightPx)
-                                        keyboardHeight = with(density) { newHeightPx.toDp() }
+                                        val newWidthPx =
+                                            (with(density) { whiteKeyWidth.toPx() } + dDistance * 0.5f)
+                                                .coerceIn(minKeyWidthPx, maxKeyWidthPx)
+                                        whiteKeyWidth = with(density) { newWidthPx.toDp() }
                                     }
                                     lastPinchDistance = distance
                                 }
@@ -222,7 +234,7 @@ fun PianoKeyboard(
                 val blackKeyWPx = with(density) { blackKeyW.toPx() }
                 val blackKeyHPx = with(density) { blackKeyH.toPx() }
 
-                val keyPositions = remember {
+                val keyPositions = remember(whiteKeyWidth) {
                     var wIdx = 0
                     ALL_KEYS.map { key ->
                         if (!key.isBlack) {
