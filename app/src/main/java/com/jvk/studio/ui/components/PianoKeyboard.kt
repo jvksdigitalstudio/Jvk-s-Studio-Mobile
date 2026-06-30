@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,6 +39,39 @@ import kotlinx.coroutines.launch
 private val BLACK_SEMITONES = setOf(1, 3, 6, 8, 10)
 private val NOTE_NAMES = listOf("C","C#","D","D#","E","F","F#","G","G#","A","A#","B")
 private val HEADER_HEIGHT = 34.dp
+
+// ── Pre-built, allocation-free visual constants for piano keys ──
+// Brush/Shape/Color objects built here ONCE at class-load time instead of
+// inside WhiteKey()/BlackKey() (which used to allocate a fresh Brush + List
+// on every single recomposition of every key — up to ~120 allocations per
+// frame during drag/zoom, which is exactly what was feeding the garbage
+// collector and showing up as stutter).
+private val WHITE_KEY_SHAPE = RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp)
+private val WHITE_KEY_GRADIENT_NORMAL = Brush.verticalGradient(
+    listOf(Color(0xFFFFFFFF), Color(0xFFF3EEFF), Color(0xFFE2D6F7), Color(0xFFD2C2EE))
+)
+private val WHITE_KEY_GRADIENT_PRESSED = Brush.verticalGradient(
+    listOf(FlPurpleLight, FlPurple, FlPurpleDim)
+)
+private val WHITE_KEY_BORDER_NORMAL  = Color(0xFFBBA8DD).copy(alpha = 0.5f)
+private val WHITE_KEY_BORDER_PRESSED = FlPurpleLight.copy(alpha = 0.8f)
+private val WHITE_KEY_LABEL_NORMAL   = Color(0xFF6B4FA8).copy(alpha = 0.85f)
+
+private val BLACK_KEY_SHAPE = RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)
+private val BLACK_KEY_GRADIENT_NORMAL = Brush.verticalGradient(
+    listOf(Color(0xFF2A1840), Color(0xFF160B26), Color(0xFF0A0514), Color(0xFF050208))
+)
+private val BLACK_KEY_GRADIENT_PRESSED = Brush.verticalGradient(
+    listOf(FlPurpleDim, Color(0xFF4C1D95), Color(0xFF3B1670))
+)
+private val BLACK_KEY_BORDER_NORMAL    = Color(0xFF4A2D78).copy(alpha = 0.6f)
+private val BLACK_KEY_BORDER_PRESSED   = FlPurpleLight.copy(alpha = 0.9f)
+private val BLACK_KEY_HIGHLIGHT_NORMAL = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = 0.18f), Color.Transparent)
+)
+private val BLACK_KEY_HIGHLIGHT_PRESSED = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = 0.12f), Color.Transparent)
+)
 
 data class KeyInfo(
     val midiNote: Int,
@@ -283,11 +315,24 @@ fun PianoKeyboard(
                 .background(Color(0xFF070410))
                 .horizontalScroll(scrollState)
         ) {
-            BoxWithConstraints {
-                val keyHeightPx = constraints.maxHeight.toFloat()
-                val keyHeight   = with(density) { keyHeightPx.toDp() }
-                val blackKeyH   = keyHeight * 0.6f
-
+            run {
+                // ── Root fix for drag/zoom lag ──
+                // This used to be `BoxWithConstraints`, which by design
+                // recomposes its ENTIRE content block every time the measured
+                // size changes — and the available height here changes on
+                // every single pixel of the header's vertical resize drag.
+                // That meant ~120 key composables (with shadows, gradients,
+                // borders) were being torn down and rebuilt on every frame
+                // just to resize the keyboard.
+                //
+                // The only thing that measured height was used for was the
+                // black keys' height (60% of available height) — a pure
+                // LAYOUT concern, not a composition concern. Expressing it as
+                // `Modifier.fillMaxHeight(0.6f)` (resolved at measure time)
+                // gives the identical visual result without ever re-running
+                // composition when the keyboard is resized vertically. Only a
+                // real pinch-zoom (which actually changes each key's width)
+                // still needs to recompose now.
                 val whiteKeyWPx = with(density) { whiteKeyWidth.toPx() }
                 val blackKeyWPx = with(density) { blackKeyW.toPx() }
 
@@ -397,7 +442,6 @@ fun PianoKeyboard(
                             BlackKey(
                                 xOffset = xDp,
                                 width   = blackKeyW,
-                                height  = blackKeyH,
                                 pressed = key.midiNote in activeNotes,
                                 onBoundsChanged = { bounds -> keyBoundsPx[key.midiNote] = bounds }
                             )
@@ -435,24 +479,20 @@ fun WhiteKey(width: Dp, pressed: Boolean, label: String, onBoundsChanged: (andro
                 .fillMaxHeight()
                 .fillMaxWidth()
                 .padding(end = 1.dp)
-                .shadow(if (pressed) 0.dp else 3.dp, RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-                .clip(RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp))
-                .background(
-                    if (pressed) Brush.verticalGradient(
-                        listOf(FlPurpleLight, FlPurple, FlPurpleDim)
-                    ) else Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFFFFFFF),
-                            Color(0xFFF3EEFF),
-                            Color(0xFFE2D6F7),
-                            Color(0xFFD2C2EE)
-                        )
-                    )
-                )
+                // No `.shadow()` here on purpose: a real elevation shadow is
+                // a separate RenderNode + blur pass that Android has to
+                // rebuild any time this key recomposes. With ~75 white keys
+                // on screen that adds up fast, and since most keys are
+                // sitting in this "resting" state at any given moment it was
+                // the single biggest cost in the keyboard, even at idle.
+                // The gradient + border below already read as a raised key;
+                // we get the same premium look for a fraction of the cost.
+                .clip(WHITE_KEY_SHAPE)
+                .background(if (pressed) WHITE_KEY_GRADIENT_PRESSED else WHITE_KEY_GRADIENT_NORMAL)
                 .border(
                     width = 0.6.dp,
-                    color = if (pressed) FlPurpleLight.copy(alpha = 0.8f) else Color(0xFFBBA8DD).copy(alpha = 0.5f),
-                    shape = RoundedCornerShape(bottomStart = 3.dp, bottomEnd = 3.dp)
+                    color = if (pressed) WHITE_KEY_BORDER_PRESSED else WHITE_KEY_BORDER_NORMAL,
+                    shape = WHITE_KEY_SHAPE
                 ),
             contentAlignment = Alignment.BottomCenter
         ) {
@@ -464,7 +504,7 @@ fun WhiteKey(width: Dp, pressed: Boolean, label: String, onBoundsChanged: (andro
                         fontWeight   = FontWeight.SemiBold,
                         fontSize     = 8.sp,
                         letterSpacing = 0.5.sp,
-                        color = if (pressed) Color.White else Color(0xFF6B4FA8).copy(alpha = 0.85f)
+                        color = if (pressed) Color.White else WHITE_KEY_LABEL_NORMAL
                     ),
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
@@ -474,47 +514,34 @@ fun WhiteKey(width: Dp, pressed: Boolean, label: String, onBoundsChanged: (andro
 }
 
 @Composable
-fun BlackKey(xOffset: Dp, width: Dp, height: Dp, pressed: Boolean, onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {}) {
+fun BlackKey(xOffset: Dp, width: Dp, pressed: Boolean, onBoundsChanged: (androidx.compose.ui.geometry.Rect) -> Unit = {}) {
     Box(
         modifier = Modifier
             .absoluteOffset(x = xOffset)
             .width(width)
-            .height(height)
+            // 60% of the available key-row height, resolved at layout time —
+            // changing the keyboard's overall height (header drag) no longer
+            // needs to touch composition at all, just re-measure.
+            .fillMaxHeight(0.6f)
             .onGloballyPositioned { coords -> onBoundsChanged(coords.boundsInParent()) }
-            .shadow(if (pressed) 1.dp else 5.dp, RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
-            .clip(RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp))
-            .background(
-                if (pressed) Brush.verticalGradient(
-                    listOf(FlPurpleDim, Color(0xFF4C1D95), Color(0xFF3B1670))
-                ) else Brush.verticalGradient(
-                    listOf(
-                        Color(0xFF2A1840),
-                        Color(0xFF160B26),
-                        Color(0xFF0A0514),
-                        Color(0xFF050208)
-                    )
-                )
-            )
+            // No `.shadow()`: same reasoning as WhiteKey — real elevation
+            // shadows on every black key were a big chunk of the per-frame
+            // cost during zoom, for a depth cue the gradient already gives.
+            .clip(BLACK_KEY_SHAPE)
+            .background(if (pressed) BLACK_KEY_GRADIENT_PRESSED else BLACK_KEY_GRADIENT_NORMAL)
             .border(
                 width = 0.6.dp,
-                color = if (pressed) FlPurpleLight.copy(alpha = 0.9f) else Color(0xFF4A2D78).copy(alpha = 0.6f),
-                shape = RoundedCornerShape(bottomStart = 4.dp, bottomEnd = 4.dp)
+                color = if (pressed) BLACK_KEY_BORDER_PRESSED else BLACK_KEY_BORDER_NORMAL,
+                shape = BLACK_KEY_SHAPE
             )
     ) {
         // subtle top highlight for glossy feel
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(height * 0.12f)
+                .fillMaxHeight(0.12f)
                 .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (pressed) 0.12f else 0.18f),
-                            Color.Transparent
-                        )
-                    )
-                )
+                .background(if (pressed) BLACK_KEY_HIGHLIGHT_PRESSED else BLACK_KEY_HIGHLIGHT_NORMAL)
         )
     }
 }
