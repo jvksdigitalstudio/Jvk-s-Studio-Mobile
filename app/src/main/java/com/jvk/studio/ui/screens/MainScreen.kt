@@ -79,31 +79,29 @@ fun MainScreen(vm: MainViewModel = viewModel()) {
                             .offset(y = (-28).dp)
                     )
 
-                    // ── Piano keyboard — anchored to bottom, animated show/hide ──
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible  = keyboardVisible,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        enter    = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
-                        exit     = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut()
-                    ) {
-                        PianoKeyboard(
-                            modifier    = Modifier.fillMaxWidth(),
-                            activeNotes = activeNotes.value,
-                            onNoteOn    = { note ->
-                                activeNotes.value = activeNotes.value + note
-                                vm.noteOn(note)
-                            },
-                            onNoteOff   = { note ->
-                                activeNotes.value = activeNotes.value - note
-                                vm.noteOff(note)
-                            },
-                            onClose    = { vm.toggleKeyboard() },
-                            // Can grow until it fully replaces the work area above
-                            // (touching AppHeader), and shrink down to just its own
-                            // header bar.
-                            maxHeight  = availableHeight,
-                        )
-                    }
+                    // ── Piano keyboard — anchored to bottom. Always mounted so its own
+                    //    header bar (resize handle + close button) stays visible even
+                    //    when "hidden" — only the keys area collapses away. ──
+                    PianoKeyboard(
+                        modifier    = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth(),
+                        activeNotes = activeNotes.value,
+                        expanded    = keyboardVisible,
+                        onNoteOn    = { note ->
+                            activeNotes.value = activeNotes.value + note
+                            vm.noteOn(note)
+                        },
+                        onNoteOff   = { note ->
+                            activeNotes.value = activeNotes.value - note
+                            vm.noteOff(note)
+                        },
+                        onClose    = { vm.toggleKeyboard() },
+                        // Can grow until it fully replaces the work area above
+                        // (touching AppHeader), and shrink down to just its own
+                        // header bar.
+                        maxHeight  = availableHeight,
+                    )
                 }
             }
         }

@@ -100,6 +100,7 @@ fun PianoKeyboard(
     onNoteOn: (Int) -> Unit,
     onNoteOff: (Int) -> Unit,
     onClose: () -> Unit = {},
+    expanded: Boolean = true,
     initialKeyWidth: Dp = 42.dp,
     minKeyWidth: Dp = 22.dp,
     maxKeyWidth: Dp = 72.dp,
@@ -120,6 +121,21 @@ fun PianoKeyboard(
     var lastExpandedHeight by remember { mutableStateOf(initialHeight) }
     val minHeightPx = with(density) { minHeight.toPx() }
     val maxHeightPx = with(density) { maxHeight.toPx() }
+
+    // ── External collapse/expand (the "hide keyboard" toggle button) ──
+    // Mirrors exactly what the header's own tap-to-collapse gesture does:
+    // collapse down to header-only height, or restore whatever height it
+    // was expanded to before. This is why the header itself must NEVER be
+    // wrapped in an AnimatedVisibility by the caller — only the keys area
+    // (driven by this height) should ever collapse away.
+    LaunchedEffect(expanded) {
+        if (expanded) {
+            keyboardHeight = lastExpandedHeight.coerceIn(minHeight, maxHeight)
+        } else {
+            if (keyboardHeight > minHeight) lastExpandedHeight = keyboardHeight
+            keyboardHeight = minHeight
+        }
+    }
 
     // ── Resizable key width (2-finger pinch on header) — like FL Mobile's
     //    piano roll zoom: spread = fewer/bigger keys, pinch = more/smaller keys. ──
